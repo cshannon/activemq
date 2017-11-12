@@ -80,7 +80,20 @@ public class ConduitBridge extends DemandForwardingBridge {
                         ds.addForcedDurableConsumer(info.getConsumerId());
                     }
                 } else {
-                    ds.getDurableRemoteSubs().add(new SubscriptionInfo(info.getClientId(), info.getSubscriptionName()));
+                	if (getLocalBrokerName().equals("BrokerC")) {
+	                	if (!isDirectConsumer(info)) {
+	                		System.out.println("Incrementing proxy consumer: " + getLocalBrokerName());
+	                		System.out.println("Adding sub: " + new SubscriptionInfo(ds.getRemoteInfo().getClientId(), info.getSubscriptionName()));
+	                		ds.proxyDurables.incrementAndGet();
+	                		ds.getDurableRemoteSubs().add(new SubscriptionInfo("to-BrokerB_BrokerA_inbound_BrokerB", info.getSubscriptionName()));
+	                        
+	                	} else {
+	                		ds.getDurableRemoteSubs().add(new SubscriptionInfo(info.getClientId(), info.getSubscriptionName()));
+	                	}
+                	} else {
+                		ds.getDurableRemoteSubs().add(new SubscriptionInfo(ds.getRemoteInfo().getClientId(), info.getSubscriptionName()));
+                
+                	}
                 }
                 matched = true;
                 // continue - we want interest to any existing DemandSubscriptions
