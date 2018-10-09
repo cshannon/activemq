@@ -2085,6 +2085,7 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
         LOG.trace("Reserved file for forwarded acks: {}", forwardsFile);
 
         Map<Integer, Set<Integer>> updatedAckLocations = new HashMap<>();
+        boolean removeJournalToRead = true;
 
         try (TargetedDataFileAppender appender = new TargetedDataFileAppender(journal, forwardsFile);) {
             KahaRewrittenDataFileCommand compactionMarker = new KahaRewrittenDataFileCommand();
@@ -2109,6 +2110,13 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
                     payload = toByteSequence(command);
                     Location location = appender.storeItem(payload, Journal.USER_RECORD_TYPE, false);
                     updatedAckLocations.put(location.getDataFileId(), journalLogsReferenced);
+                } else if (command instanceof KahaCommitCommand || command instanceof KahaPrepareCommand
+                        || command instanceof KahaRollbackCommand) {
+                    //Don't remove journal file from ackMessageFileMap if it contains transaction commands as these
+                    //are now tracked in the map
+                    //The normal GC task will take care of removing the file from the map if all of the transaction
+                    //commands are not part of in progress transactions
+                    removeJournalToRead = false;
                 }
 
                 nextLocation = getNextLocationForAckForward(nextLocation, limit);
@@ -2133,8 +2141,10 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
         }
 
         // remove the old location data from the ack map so that the old journal log file can
-        // be removed on next GC.
-        metadata.ackMessageFileMap.remove(journalToRead);
+        // be removed on next GC. Do not remove file has transaction commands
+        if (removeJournalToRead) {
+            metadata.ackMessageFileMap.remove(journalToRead);
+        }
 
         indexLock.writeLock().unlock();
 
