@@ -78,6 +78,11 @@
       <version>${leveldbjni-version}</version>
     </dependency>
     
+    <dependency>
+      <groupId>javax.xml.bind</groupId>
+      <artifactId>jaxb-api</artifactId>
+    </dependency>
+    
     <!-- Lets not include the JNI libs for now so that we can harden the pure java driver more -->
     <!--
     <dependency>
@@ -378,6 +383,7 @@
           <scalaVersion>${scala-version}</scalaVersion>
           <args>
             <arg>-deprecation</arg>
+            <arg>-nobootcp</arg>
           </args>
           <compilerPlugins>
             <!-- <compilerPlugin>

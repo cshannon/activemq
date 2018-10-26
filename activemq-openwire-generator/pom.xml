@@ -51,7 +51,7 @@
   </dependencies>
 
   <profiles>
-    <profile>
+    <!-- >profile>
       <id>default-tools.jar</id>
       <activation>
         <property>
@@ -68,7 +68,7 @@
           <systemPath>${java.home}/../lib/tools.jar</systemPath>
         </dependency>
       </dependencies>
-    </profile>
+    </profile -->
   </profiles>
 
   <build>
