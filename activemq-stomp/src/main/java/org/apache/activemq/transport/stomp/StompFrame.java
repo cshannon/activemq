@@ -16,16 +16,21 @@
  */
 package org.apache.activemq.transport.stomp;
 
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import java.util.zip.InflaterInputStream;
 import org.apache.activemq.command.Command;
 import org.apache.activemq.command.Endpoint;
 import org.apache.activemq.command.Response;
 import org.apache.activemq.state.CommandVisitor;
+import org.apache.activemq.util.ByteArrayInputStream;
 import org.apache.activemq.util.MarshallingSupport;
 
 /**
@@ -75,10 +80,12 @@ public class StompFrame implements Command {
     }
 
     public String getBody() {
-        try {
-            return new String(content, "UTF-8");
+        try (DataInputStream dataIn = new DataInputStream(new ByteArrayInputStream(content))) {
+            return MarshallingSupport.readUTF8(dataIn);
         } catch (UnsupportedEncodingException e) {
             return new String(content);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

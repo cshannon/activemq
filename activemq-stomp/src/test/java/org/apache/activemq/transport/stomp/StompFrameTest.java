@@ -16,11 +16,19 @@
  */
 package org.apache.activemq.transport.stomp;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
 
+import org.apache.activemq.command.ActiveMQTextMessage;
+import org.apache.activemq.openwire.OpenWireFormat;
+import org.apache.activemq.util.ByteArrayOutputStream;
+import org.apache.activemq.util.ByteSequence;
+import org.apache.activemq.util.MarshallingSupport;
 import org.junit.Test;
 
 public class StompFrameTest {
@@ -35,5 +43,38 @@ public class StompFrameTest {
 
         assertEquals("no password present", -1, underTest.toString().indexOf("please"));
         assertTrue("*** present", underTest.toString().indexOf("***") > 0);
+    }
+
+    @Test
+    public void testEncoding() throws Exception {
+        String text = "!®౩\uD83D\uDE42";
+        StompFrame testFrame = new StompFrame();
+
+        ByteSequence encoded;
+        try (ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+            DataOutputStream dataOut = new DataOutputStream(bytesOut)) {
+            MarshallingSupport.writeUTF8(dataOut, text);
+            encoded = bytesOut.toByteSequence();
+            testFrame.setContent(encoded.getData());
+        }
+
+        // verify stomp can write/read back original string
+        assertEquals(text, testFrame.getBody());
+
+        // Verify compatible with ActiveMQTextMessage
+        ActiveMQTextMessage message = new ActiveMQTextMessage();
+        message.setContent(encoded);
+        assertEquals(text, message.getText());
+
+        // Re-encode with ActivemqTextMessage and verify byte array
+        message = new ActiveMQTextMessage();
+        message.setText(text);
+        message.beforeMarshall(new OpenWireFormat());
+        assertArrayEquals(encoded.getData(), message.getContent().getData());
+
+        // Re-encode with ActivemqTextMessage and decode with Stomp
+        testFrame = new StompFrame();
+        testFrame.setContent(message.getContent().getData());
+        assertEquals(text, testFrame.getBody());
     }
 }
