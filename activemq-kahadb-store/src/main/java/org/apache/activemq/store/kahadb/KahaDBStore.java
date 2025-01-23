@@ -741,26 +741,18 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                     public void execute(Transaction tx) throws Exception {
                         StoredDestination sd = getStoredDestination(dest, tx);
                         Entry<Long, MessageKeys> entry = null;
-                        int position = 0;
                         int counter = recoverRolledBackAcks(destination.getPhysicalName(), sd, tx, maxReturned, listener);
                         Set ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
+                        sd.orderIndex.setBatch(tx, (long) offset - 1);
                         for (Iterator<Entry<Long, MessageKeys>> iterator = sd.orderIndex.iterator(tx); iterator.hasNext(); ) {
                             entry = iterator.next();
-
                             if (ackedAndPrepared != null && ackedAndPrepared.contains(entry.getValue().messageId)) {
                                 continue;
                             }
-
-                            if(offset > 0 && offset > position) {
-                                position++;
-                                continue;
-                            }
-
                             Message msg = loadMessage(entry.getValue().location);
                             msg.getMessageId().setFutureOrSequenceLong(entry.getKey());
                             listener.recoverMessage(msg);
                             counter++;
-                            position++;
                             if (counter >= maxReturned || !listener.canRecoveryNextMessage()) {
                                 break;
                             }
