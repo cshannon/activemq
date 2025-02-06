@@ -292,6 +292,9 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
     private boolean enableIndexDiskSyncs = true;
     private boolean enableIndexRecoveryFile = true;
     private boolean enableIndexPageCaching = true;
+    private boolean enableIndexCompaction = false;
+    private float minFreePageCompactionRatio = .1F;
+    private float maxFreePageCompactionRatio = .3F;
     ReentrantReadWriteLock checkpointLock = new ReentrantReadWriteLock();
 
     private boolean enableAckCompaction = true;
@@ -1795,6 +1798,8 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
                     }
                 });
                 pageFile.flush();
+                pageFile.compact();
+
                 // after the index update such that partial removal does not leave dangling references in the index.
                 journal.removeDataFiles(filesToGc);
             } finally {
@@ -3400,6 +3405,9 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
         index.setEnableDiskSyncs(isEnableIndexDiskSyncs());
         index.setEnableRecoveryFile(isEnableIndexRecoveryFile());
         index.setEnablePageCaching(isEnableIndexPageCaching());
+        index.setEnableCompaction(isEnableIndexCompaction());
+        index.setMaxFreePageCompactionRatio(getMaxFreePageCompactionRatio());
+        index.setMinFreePageCompactionRatio(getMinFreePageCompactionRatio());
         return index;
     }
 
@@ -4253,6 +4261,30 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
      */
     public void setEnableSubscriptionStatistics(boolean enableSubscriptionStatistics) {
         this.enableSubscriptionStatistics = enableSubscriptionStatistics;
+    }
+
+    public float getMinFreePageCompactionRatio() {
+        return minFreePageCompactionRatio;
+    }
+
+    public void setMinFreePageCompactionRatio(float minFreePageCompactionRatio) {
+        this.minFreePageCompactionRatio = minFreePageCompactionRatio;
+    }
+
+    public float getMaxFreePageCompactionRatio() {
+        return maxFreePageCompactionRatio;
+    }
+
+    public void setMaxFreePageCompactionRatio(float maxFreePageCompactionRatio) {
+        this.maxFreePageCompactionRatio = maxFreePageCompactionRatio;
+    }
+
+    public boolean isEnableIndexCompaction() {
+        return enableIndexCompaction;
+    }
+
+    public void setEnableIndexCompaction(boolean enableIndexCompaction) {
+        this.enableIndexCompaction = enableIndexCompaction;
     }
 
     private static class MessageDatabaseObjectInputStream extends ObjectInputStream {

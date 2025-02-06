@@ -769,6 +769,30 @@ public class KahaDBPersistenceAdapter extends LockableServiceSupport implements 
         letter.setEnableSubscriptionStatistics(enableSubscriptionStatistics);
     }
 
+    public float getMinFreePageCompactionRatio() {
+        return letter.getMinFreePageCompactionRatio();
+    }
+
+    public void setMinFreePageCompactionRatio(float minFreePageCompactionRatio) {
+        letter.setMinFreePageCompactionRatio(minFreePageCompactionRatio);
+    }
+
+    public float getMaxFreePageCompactionRatio() {
+        return letter.getMaxFreePageCompactionRatio();
+    }
+
+    public void setMaxFreePageCompactionRatio(float maxFreePageCompactionRatio) {
+        letter.setMaxFreePageCompactionRatio(maxFreePageCompactionRatio);
+    }
+
+    public boolean isEnableIndexCompaction() {
+        return letter.isEnableIndexCompaction();
+    }
+
+    public void setEnableIndexCompaction(boolean enableIndexCompaction) {
+        letter.setEnableIndexCompaction(enableIndexCompaction);
+    }
+
     public KahaDBStore getStore() {
         return letter;
     }

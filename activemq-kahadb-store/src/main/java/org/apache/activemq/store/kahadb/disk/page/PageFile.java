@@ -137,8 +137,8 @@ public class PageFile {
     private final AtomicLong nextFreePageId = new AtomicLong();
     private SequenceSet freeList = new SequenceSet();
 
-    private AtomicReference<SequenceSet> recoveredFreeList = new AtomicReference<SequenceSet>();
-    private AtomicReference<SequenceSet> trackingFreeDuringRecovery = new AtomicReference<SequenceSet>();
+    private final AtomicReference<SequenceSet> recoveredFreeList = new AtomicReference<SequenceSet>();
+    private final AtomicReference<SequenceSet> trackingFreeDuringRecovery = new AtomicReference<SequenceSet>();
 
     private final AtomicLong nextTxid = new AtomicLong();
 
@@ -149,6 +149,12 @@ public class PageFile {
 
     private boolean useLFRUEviction = false;
     private float LFUEvictionFactor = 0.2f;
+
+
+    // Compaction config
+    private boolean enableCompaction = false;
+    private float minFreePageCompactionRatio = .1F;
+    private float maxFreePageCompactionRatio = .3F;
 
     /**
      * Use to keep track of updated pages which have not yet been committed.
@@ -618,6 +624,112 @@ public class PageFile {
         }
     }
 
+    public void compact() throws IOException {
+        if (!enableCompaction) {
+            LOG.debug("Skipping PageFile compaction check, compaction is disabled.");
+            return;
+        }
+
+        LOG.debug("Beginning PageFile compaction check.");
+
+        // Don't compact if we have not finished free page recovery
+        if (trackingFreeDuringRecovery.get() != null) {
+            LOG.debug("Skipping compaction, async recovery not finished");
+            return;
+        }
+
+        // diskSize computed by checking nextFreePageId
+        long diskSize = getDiskSize();
+
+        // Disk size of the free pages in the page file
+        long freePageCount = getFreePageCount();
+        long totalPageCount = getPageCount();
+
+        // Percentage of pages that are free vs in use
+        double freePageRatio = Math.round((double)freePageCount / totalPageCount * 100d) / 100d;
+
+        // Only attempt to compact if we have reached the maximum ratio of free pages
+        // that is configured.
+        var tolerance = .001;
+        if (freePageRatio < maxFreePageCompactionRatio - tolerance) {
+            var formatted = Math.round((double)freePageCount / totalPageCount * 100d) / 100d;
+            LOG.debug("Skipping compaction, page file freePageRatio {} is less than "
+              + "configured maxFreePageCompactionRatio {}", String.format("%,.2f", formatted), maxFreePageCompactionRatio);
+            return;
+        }
+
+        // Get the last sequence of contiguous set of free pages in the file
+        // This block could be either in the middle of the file somewhere or
+        // at the end of the file
+        final Sequence lastFreeSeq = freeList.getTail();
+
+        // Sanity check, should not happen if we have a free page ratio
+        if (lastFreeSeq == null) {
+            LOG.warn("Skipping compaction, no free pages");
+            return;
+        }
+
+        // If we have a block of free pages then check if it is
+        // at the end of the file.
+        //
+        // If the offset of the last free page + the size of a page
+        // (to account for the nextFreePage that was allocated already)
+        // equals the disk size then there are no in use pages after this block.
+        if (toOffset(lastFreeSeq.getLast()) + pageSize != diskSize) {
+            LOG.info("Unable to compact, last free page block is not at the end of the file");
+            return;
+        }
+
+        long minFreePages = (long) Math.ceil(totalPageCount * minFreePageCompactionRatio);
+
+        // we must keep a minimum number of free pages so find the point
+        // where we can truncate without removing too many pages
+        long maxPagesToTruncate = freePageCount - minFreePages;
+
+        final Sequence freePagesToDelete;
+        if (lastFreeSeq.range() > maxPagesToTruncate) {
+            var last = lastFreeSeq.getLast();
+            var updatedFirst = (last - maxPagesToTruncate) + 1;
+            freePagesToDelete = new Sequence(updatedFirst, last);
+        } else {
+            freePagesToDelete = lastFreeSeq;
+        }
+
+        synchronized (writes) {
+            // Generally this should be empty but need to verify
+            if (!writes.isEmpty()) {
+                LOG.warn("Skipping compaction, writes are in flight.");
+                return;
+            }
+
+            LOG.debug("Number of free pages to be deleted: {}", freePagesToDelete.range());
+            LOG.debug("Disk size of end of file free pages: {}", pageSize * freePagesToDelete.range());
+
+            if (enablePageCaching) {
+                pageCache.keySet().removeIf(freePagesToDelete::contains);
+            }
+
+            long newDiskSize = toOffset(freePagesToDelete.getFirst());
+            LOG.debug("Truncating page file to length: {}", newDiskSize);
+
+            // After truncating file, update metadata
+            if (freePagesToDelete == lastFreeSeq) {
+                freeList.removeLastSequence();
+            } else {
+                freeList.remove(freePagesToDelete);
+            }
+            nextFreePageId.getAndAdd(-freePagesToDelete.range());
+
+            writeFile.getRaf().setLength(newDiskSize);
+            if (enableDiskSyncs) {
+                writeFile.sync();
+            }
+
+            LOG.debug("Page file was compacted, new length: {}, old length:{}", newDiskSize, diskSize);
+            LOG.debug("New page count: {}, free page count: {}", getPageCount(), getFreePageCount());
+        }
+    }
+
 
     @Override
     public String toString() {
@@ -894,7 +1006,34 @@ public class PageFile {
         this.useLFRUEviction = useLFRUEviction;
     }
 
-    ///////////////////////////////////////////////////////////////////
+    public boolean isEnableCompaction() {
+        return enableCompaction;
+    }
+
+    public void setEnableCompaction(boolean enableCompaction) {
+        assertNotLoaded();
+        this.enableCompaction = enableCompaction;
+    }
+
+    public float getMinFreePageCompactionRatio() {
+        return minFreePageCompactionRatio;
+    }
+
+    public void setMinFreePageCompactionRatio(float minFreePageCompactionRatio) {
+        assertNotLoaded();
+        this.minFreePageCompactionRatio = minFreePageCompactionRatio;
+    }
+
+    public float getMaxFreePageCompactionRatio() {
+        return maxFreePageCompactionRatio;
+    }
+
+    public void setMaxFreePageCompactionRatio(float maxFreePageCompactionRatio) {
+        assertNotLoaded();
+        this.maxFreePageCompactionRatio = maxFreePageCompactionRatio;
+    }
+
+///////////////////////////////////////////////////////////////////
     // Package Protected Methods exposed to Transaction
     ///////////////////////////////////////////////////////////////////
 
