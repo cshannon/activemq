@@ -16,6 +16,7 @@
  */
 package org.apache.activemq.broker.region.cursors;
 
+import org.apache.activemq.broker.region.IndirectTopicSubMessageReference;
 import org.apache.activemq.broker.region.MessageReference;
 import org.apache.activemq.broker.region.Subscription;
 import org.apache.activemq.broker.region.Topic;
@@ -149,6 +150,11 @@ class TopicStorePrefetch extends AbstractStoreCursor {
         if (!this.storeHasMessages && (!this.batchList.isEmpty() || !hadSpace)) {
             this.storeHasMessages = true;
         }
+    }
+
+    @Override
+    protected MessageReference createBatchListRef(Message message) {
+        return new IndirectTopicSubMessageReference(message);
     }
 
     public byte getLastRecoveredPriority() {
