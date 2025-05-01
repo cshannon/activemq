@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -53,6 +55,7 @@ import org.apache.activemq.filter.MessageEvaluationContext;
 import org.apache.activemq.filter.NonCachedMessageEvaluationContext;
 import org.apache.activemq.management.MessageFlowStats;
 import org.apache.activemq.store.MessageRecoveryListener;
+import org.apache.activemq.store.MessageStore.StoreType;
 import org.apache.activemq.store.NoLocalSubscriptionAware;
 import org.apache.activemq.store.PersistenceAdapter;
 import org.apache.activemq.store.TopicMessageStore;
@@ -830,7 +833,36 @@ public class Topic extends BaseDestination implements Task {
         @Override
         public void run() {
             List<Message> browsedMessages = new InsertionCountList<Message>();
-            doBrowse(browsedMessages, getMaxExpirePageSize());
+            final TopicMessageStore store = Topic.this.topicStore;
+            if (store.getType() == StoreType.KAHADB) {
+                try {
+                    var expired = store.recoverExpired(getMaxExpirePageSize());
+                    final ConnectionContext connectionContext = createConnectionContext();
+                    for (Entry<Message, Set<SubscriptionKey>> entry : expired.entrySet()) {
+                        Message message = entry.getKey();
+                        entry.getValue().forEach(subKey -> {
+                            DurableTopicSubscription sub = durableSubscribers.get(subKey);
+                            if (sub != null && (!sub.isActive()
+                                || sub.isEnableMessageExpirationOnActiveDurableSubs())) {
+
+                                synchronized (sub.pendingLock) {
+                                    synchronized (sub.dispatchLock) {
+                                        if (sub.dispatched.isEmpty()) {
+                                            message.setRegionDestination(Topic.this);
+                                            messageExpired(connectionContext, sub, message);
+                                        }
+                                    }
+                                }
+
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                doBrowse(browsedMessages, getMaxExpirePageSize());
+            }
             expiryTaskInProgress.set(false);
         }
     };

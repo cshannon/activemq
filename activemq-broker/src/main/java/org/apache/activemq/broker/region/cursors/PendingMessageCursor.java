@@ -176,6 +176,8 @@ public interface PendingMessageCursor extends Service {
      */
     void remove(MessageReference node);
 
+    void decrement(MessageReference node);
+
     /**
      * free up any internal buffers
      */

@@ -63,6 +63,7 @@ import org.apache.activemq.store.kahadb.disk.page.Transaction;
 import org.apache.activemq.usage.MemoryUsage;
 import org.apache.activemq.usage.SystemUsage;
 import org.apache.activemq.util.ByteSequence;
+import org.apache.activemq.util.SubscriptionKey;
 import org.apache.activemq.wireformat.WireFormat;
 
 public class TempKahaDBStore extends TempMessageDatabase implements PersistenceAdapter, BrokerServiceAware {
@@ -299,6 +300,10 @@ public class TempKahaDBStore extends TempMessageDatabase implements PersistenceA
             getMessageStoreStatistics().getMessageCount().setCount(count);
         }
 
+        @Override
+        public StoreType getType() {
+            return StoreType.TEMP_KAHADB;
+        }
     }
 
     class KahaDBTopicMessageStore extends KahaDBMessageStore implements TopicMessageStore {
@@ -330,6 +335,11 @@ public class TempKahaDBStore extends TempMessageDatabase implements PersistenceA
             org.apache.activemq.util.ByteSequence packet = wireFormat.marshal(subscriptionInfo);
             command.setSubscriptionInfo(new Buffer(packet.getData(), packet.getOffset(), packet.getLength()));
             process(command);
+        }
+
+        @Override
+        public Map<Message, Set<SubscriptionKey>> recoverExpired(int max) {
+            throw new UnsupportedOperationException("recoverExpired not supported");
         }
 
         @Override

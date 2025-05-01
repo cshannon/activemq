@@ -18,6 +18,8 @@ package org.apache.activemq.store;
 
 import java.io.IOException;
 
+import java.util.Map;
+import java.util.Set;
 import org.apache.activemq.broker.ConnectionContext;
 import org.apache.activemq.command.ActiveMQDestination;
 import org.apache.activemq.command.Message;
@@ -25,6 +27,7 @@ import org.apache.activemq.command.MessageAck;
 import org.apache.activemq.command.MessageId;
 import org.apache.activemq.command.SubscriptionInfo;
 import org.apache.activemq.usage.MemoryUsage;
+import org.apache.activemq.util.SubscriptionKey;
 
 /**
  * A simple proxy that delegates to another MessageStore.
@@ -234,5 +237,10 @@ public class ProxyTopicMessageStore extends ProxyMessageStore implements TopicMe
     @Override
     public MessageStoreSubscriptionStatistics getMessageStoreSubStatistics() {
         return ((TopicMessageStore)delegate).getMessageStoreSubStatistics();
+    }
+
+    @Override
+    public Map<Message, Set<SubscriptionKey>> recoverExpired(int max) throws Exception {
+        return ((TopicMessageStore)delegate).recoverExpired(max);
     }
 }

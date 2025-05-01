@@ -295,7 +295,7 @@ public class DurableTopicSubscription extends PrefetchSubscription implements Us
     }
 
     public void removePending(MessageReference node) throws IOException {
-        pending.remove(node);
+        pending.decrement(node);
     }
 
     @Override

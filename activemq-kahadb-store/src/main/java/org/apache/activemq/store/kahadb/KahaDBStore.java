@@ -83,12 +83,14 @@ import org.apache.activemq.store.kahadb.data.KahaSubscriptionCommand;
 import org.apache.activemq.store.kahadb.data.KahaUpdateMessageCommand;
 import org.apache.activemq.store.kahadb.disk.journal.Location;
 import org.apache.activemq.store.kahadb.disk.page.Transaction;
+import org.apache.activemq.store.kahadb.disk.page.Transaction.CallableClosure;
 import org.apache.activemq.store.kahadb.disk.util.SequenceSet;
 import org.apache.activemq.store.kahadb.scheduler.JobSchedulerStoreImpl;
 import org.apache.activemq.usage.MemoryUsage;
 import org.apache.activemq.usage.SystemUsage;
 import org.apache.activemq.util.IOExceptionSupport;
 import org.apache.activemq.util.ServiceStopper;
+import org.apache.activemq.util.SubscriptionKey;
 import org.apache.activemq.util.ThreadPoolUtils;
 import org.apache.activemq.wireformat.WireFormat;
 import org.slf4j.Logger;
@@ -958,9 +960,14 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                 unlockAsyncJobQueue();
             }
         }
+
+        @Override
+        public StoreType getType() {
+            return StoreType.KAHADB;
+        }
     }
 
-    class KahaDBTopicMessageStore extends KahaDBMessageStore implements TopicMessageStore {
+    class KahaDBTopicMessageStore extends KahaDBMessageStore implements TopicMessageStore{
         private final AtomicInteger subscriptionCount = new AtomicInteger();
         protected final MessageStoreSubscriptionStatistics messageStoreSubStats =
                 new MessageStoreSubscriptionStatistics(isEnableSubscriptionStatistics());
@@ -1318,6 +1325,48 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                         }
                     }
                 });
+            } finally {
+                indexLock.writeLock().unlock();
+            }
+        }
+
+        @Override
+        public Map<Message,Set<SubscriptionKey>> recoverExpired(int max) throws Exception {
+            // recovery may involve expiry which will modify
+            indexLock.writeLock().lock();
+            try {
+                return pageFile.tx().execute(
+                    (CallableClosure<Map<Message, Set<SubscriptionKey>>, Exception>) tx -> {
+                        StoredDestination sd = getStoredDestination(dest, tx);
+                        sd.orderIndex.resetCursorPosition();
+                        int count = 0;
+                        final Map<Message, Set<SubscriptionKey>> expired = new HashMap<>();
+                        final Map<String, SubscriptionKey> subscriptionKeys = new HashMap<>();
+
+                        for (Iterator<Entry<Long, MessageKeys>> iterator =
+                            sd.orderIndex.iterator(tx, new MessageOrderCursor()); count < max && iterator.hasNext(); ) {
+                            count++;
+                            Entry<Long, MessageKeys> entry = iterator.next();
+                            Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
+                            if (ackedAndPrepared != null && ackedAndPrepared.contains(entry.getValue().messageId)) {
+                                continue;
+                            }
+                            Message msg = loadMessage(entry.getValue().location);
+                            if (msg.isExpired()) {
+                                Set<SubscriptionKey> subs = expired.computeIfAbsent(msg, m -> new HashSet<>());
+                                for(String subKey : sd.subscriptionCache) {
+                                    SequenceSet sequence = sd.ackPositions.get(tx, subKey);
+                                    if (sequence != null && sequence.contains(entry.getKey())) {
+                                        subs.add(subscriptionKeys.computeIfAbsent(subKey, sk -> {
+                                            String[] sub = sk.split(":");
+                                            return new SubscriptionKey(sub[0], sub[1]);
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                      return expired;
+                    });
             } finally {
                 indexLock.writeLock().unlock();
             }

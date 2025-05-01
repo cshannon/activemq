@@ -163,6 +163,11 @@ public abstract class AbstractPendingMessageCursor implements PendingMessageCurs
     }
 
     @Override
+    public void decrement(MessageReference node) {
+        remove(node);
+    }
+
+    @Override
     public void gc() {
     }
 

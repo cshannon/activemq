@@ -460,6 +460,17 @@ public abstract class AbstractStoreCursor extends AbstractPendingMessageCursor i
         }
     }
 
+    @Override
+    public void decrement(MessageReference node) {
+        final PendingNode message = batchList.remove(node);
+        if (message != null) {
+            setCacheEnabled(false);
+            message.getMessage().decrementReferenceCount();
+        }
+
+        // always decrement
+        size--;
+    }
 
     @Override
     public final synchronized void clear() {

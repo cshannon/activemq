@@ -40,6 +40,7 @@ import org.apache.activemq.store.MessageStoreSubscriptionStatistics;
 import org.apache.activemq.store.TopicMessageStore;
 import org.apache.activemq.util.ByteSequence;
 import org.apache.activemq.util.IOExceptionSupport;
+import org.apache.activemq.util.SubscriptionKey;
 import org.apache.activemq.wireformat.WireFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -358,6 +359,11 @@ public class JDBCTopicMessageStore extends JDBCMessageStore implements TopicMess
         } finally {
             c.close();
         }
+    }
+
+    @Override
+    public Map<Message, Set<SubscriptionKey>> recoverExpired(int max) {
+        throw new UnsupportedOperationException("recoverExpired not supported");
     }
 
     /**

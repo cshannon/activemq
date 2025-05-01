@@ -280,6 +280,13 @@ public class StoreDurableSubscriberCursor extends AbstractPendingMessageCursor {
     }
 
     @Override
+    public void decrement(MessageReference node) {
+        for (PendingMessageCursor tsp : storePrefetches) {
+            tsp.decrement(node);
+        }
+    }
+
+    @Override
     public synchronized void reset() {
         for (PendingMessageCursor storePrefetch : storePrefetches) {
             storePrefetch.reset();
