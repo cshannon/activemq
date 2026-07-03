@@ -16,34 +16,22 @@
  */
 package org.apache.activemq.command;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
-
 import jakarta.jms.JMSException;
 import jakarta.jms.MessageNotWriteableException;
 import jakarta.jms.TextMessage;
-
 import org.apache.activemq.ActiveMQConnection;
-import org.apache.activemq.util.ByteArrayInputStream;
-import org.apache.activemq.util.ByteArrayOutputStream;
 import org.apache.activemq.util.ByteSequence;
-import org.apache.activemq.util.JMSExceptionSupport;
 import org.apache.activemq.util.MarshallingSupport;
 import org.apache.activemq.wireformat.WireFormat;
+
+import java.io.IOException;
+import java.util.HashMap;
 
 /**
  * @openwire:marshaller code="28"
  *
  */
-public class ActiveMQTextMessage extends ActiveMQMessage implements TextMessage {
-
-    public static final byte DATA_STRUCTURE_TYPE = CommandTypes.ACTIVEMQ_TEXT_MESSAGE;
+public class ActiveMQTextMessage extends ActiveMQServerTextMessage implements TextMessage {
 
     protected String text;
 
@@ -57,16 +45,6 @@ public class ActiveMQTextMessage extends ActiveMQMessage implements TextMessage 
     private void copy(ActiveMQTextMessage copy) {
         super.copy(copy);
         copy.text = text;
-    }
-
-    @Override
-    public byte getDataStructureType() {
-        return DATA_STRUCTURE_TYPE;
-    }
-
-    @Override
-    public String getJMSXMimeType() {
-        return "jms/text-message";
     }
 
     @Override
@@ -88,34 +66,6 @@ public class ActiveMQTextMessage extends ActiveMQMessage implements TextMessage 
         return text;
     }
 
-    private String decodeContent(ByteSequence bodyAsBytes) throws JMSException {
-        String text = null;
-        if (bodyAsBytes != null) {
-            InputStream is = null;
-            try {
-                is = new ByteArrayInputStream(bodyAsBytes);
-                if (isCompressed()) {
-                    // wrap the stream so we don't inflate past maxInflatedDataSize
-                    is = MarshallingSupport.createInflaterInputStream(getMaxInflatedDataSize(), is);
-                }
-                DataInputStream dataIn = new DataInputStream(is);
-                text = MarshallingSupport.readUTF8(dataIn);
-                dataIn.close();
-            } catch (IOException ioe) {
-                throw JMSExceptionSupport.create(ioe);
-            } finally {
-                if (is != null) {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                        // ignore
-                    }
-                }
-            }
-        }
-        return text;
-    }
-
     @Override
     public void beforeMarshall(WireFormat wireFormat) throws IOException {
         super.beforeMarshall(wireFormat);
@@ -130,24 +80,14 @@ public class ActiveMQTextMessage extends ActiveMQMessage implements TextMessage 
 
     @Override
     public void storeContent() {
-        try {
-            ByteSequence content = getContent();
-            String text = this.text;
-            if (content == null && text != null) {
-                ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-                OutputStream os = bytesOut;
-                ActiveMQConnection connection = getConnection();
-                if (connection != null && connection.isUseCompression()) {
-                    compressed = true;
-                    os = new DeflaterOutputStream(os);
-                }
-                DataOutputStream dataOut = new DataOutputStream(os);
-                MarshallingSupport.writeUTF8(dataOut, text);
-                dataOut.close();
-                setContent(bytesOut.toByteSequence());
+        ByteSequence content = getContent();
+        String text = this.text;
+        if (content == null && text != null) {
+            setContent(this.encodeContent(text));
+            ActiveMQConnection connection = getConnection();
+            if (connection != null && connection.isUseCompression()) {
+                compressed = true;
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 
