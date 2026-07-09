@@ -29,9 +29,16 @@ public class SchedulerTimerTask extends TimerTask {
     private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerTimerTask.class);
 
     private final Runnable task;
+    private final boolean terminateOnError;
 
     public SchedulerTimerTask(Runnable task) {
+        // It's usually not possible to recover from Error so default is true
+        this(task, true);
+    }
+
+    public SchedulerTimerTask(Runnable task, boolean terminateOnError) {
         this.task = task;
+        this.terminateOnError = terminateOnError;
     }
 
     public void run() {
@@ -40,8 +47,12 @@ public class SchedulerTimerTask extends TimerTask {
         } catch (Error error) {
             // Very bad error. Can't swallow this but can log it.
             LOGGER.error("Scheduled task error", error);
+            if (terminateOnError) {
+                LOGGER.error("Exiting JVM due to error: {} ", error.getMessage());
+                System.exit(1);
+            }
             throw error;
-        } catch (Exception exception) {
+        } catch (Throwable exception) {
             // It is a known issue of java.util.Timer that if a TimerTask.run() method throws an exception, the
             // Timer's thread exits as if Timer.cancel() had been called. This makes the Timer completely unusable from
             // that point on - whenever the Timer triggers there is an 'IllegalStateException: Timer already cancelled'
