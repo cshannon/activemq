@@ -54,7 +54,7 @@
       <plugin>
         <groupId>org.eclipse.jetty.ee11</groupId>
         <artifactId>jetty-ee11-maven-plugin</artifactId>
-        <version>${jetty-version}</version>
+        <version>12.1.11</version>
         <configuration>
           <httpConnector>
             <port>${jetty.port}</port>
