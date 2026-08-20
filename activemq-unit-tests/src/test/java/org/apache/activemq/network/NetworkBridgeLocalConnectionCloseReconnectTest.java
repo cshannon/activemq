@@ -19,6 +19,7 @@ package org.apache.activemq.network;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.jms.Connection;
@@ -114,7 +115,7 @@ public class NetworkBridgeLocalConnectionCloseReconnectTest {
         var bridgeLocalConnection = findVmConnection(localBroker);
         assertNotNull("expected the bridge's local vm:// connection on the local broker", bridgeLocalConnection);
         LOG.info("stopping the bridge's local connection server-side: {}", bridgeLocalConnection);
-        bridgeLocalConnection.stop();
+        bridgeLocalConnection.serviceException(new IOException());
 
         // Connection stop is different from broker stop
         var reconnected = Wait.waitFor(() -> {

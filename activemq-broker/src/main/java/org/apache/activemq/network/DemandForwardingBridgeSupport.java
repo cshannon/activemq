@@ -1332,8 +1332,23 @@ public abstract class DemandForwardingBridgeSupport implements NetworkBridge, Br
                         LOG.info("{} Shutting down {}", configuration.getBrokerName(), configuration.getName());
                         stop();
                     } else {
-                        // Administrative shutdown via .stop() or SlowConsumerStrategy needs lifecycle clean-up
-                        serviceLocalException(new IOException("Local network connection was shut down while the broker is still running"));
+                        boolean stopped = false;
+                        for (var connection : brokerService.getRegionBroker().getClients()) {
+                            var address = connection.getRemoteAddress();
+                            if (localBroker.toString().equals(address)
+                                    && connection instanceof TransportConnection c) {
+                                if (c.getTransportException() != null) {
+                                    // Administrative shutdown via .stop() or SlowConsumerStrategy needs lifecycle clean-up
+                                    serviceLocalException(new IOException(
+                                            "Local network connection was shut down while the broker is still running"));
+                                    break;
+                                }
+                            }
+                        }
+                        if (!stopped) {
+                            LOG.info("{} Shutting down {}", configuration.getBrokerName(), configuration.getName());
+                            stop();
+                        }
                     }
                 } else if (command.getClass() == ConnectionError.class) {
                     ConnectionError ce = (ConnectionError) command;

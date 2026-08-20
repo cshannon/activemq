@@ -1822,4 +1822,8 @@ public class TransportConnection implements Connection, Task, CommandVisitor {
     public Long getConnectedTimestamp() {
         return this.connectedTimestamp;
     }
+
+    public Throwable getTransportException() {
+        return transportException.get();
+    }
 }
