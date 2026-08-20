@@ -157,7 +157,7 @@
               org.slf4j.spi;version="[1.6,2)";resolution:=optional,
               org.apache.log4j;version="[2,3)";resolution:=optional,
               org.apache.log4j.spi;version="[2,3)";resolution:=optional,
-              org.eclipse.jetty*;resolution:=optional;version="${jetty-version-range}",
+              org.eclipse.jetty*;resolution:=optional;version="${range-jetty-version}",
               org.objectweb.asm*;version="[6,10)"
             </Import-Package>
             <_contract>!*</_contract>
