@@ -44,13 +44,13 @@ public class PeerTransportFactory extends TransportFactory {
     private static final IdGenerator ID_GENERATOR = new IdGenerator("peer-");
 
     @Override
-    public Transport doConnect(URI location) throws Exception {
+    public Transport doConnect(URI location) throws IOException {
         VMTransportFactory vmTransportFactory = createTransportFactory(location);
         return vmTransportFactory.doConnect(location);
     }
 
     @Override
-    public Transport doCompositeConnect(URI location) throws Exception {
+    public Transport doCompositeConnect(URI location) throws IOException {
         VMTransportFactory vmTransportFactory = createTransportFactory(location);
         return vmTransportFactory.doCompositeConnect(location);
     }
@@ -82,12 +82,12 @@ public class PeerTransportFactory extends TransportFactory {
             final String finalGroup = group;
             VMTransportFactory rc = new VMTransportFactory() {
                 @Override
-                public Transport doConnect(URI ignore) throws Exception {
+                public Transport doConnect(URI ignore) throws IOException {
                     return super.doConnect(finalLocation);
                 };
 
                 @Override
-                public Transport doCompositeConnect(URI ignore) throws Exception {
+                public Transport doCompositeConnect(URI ignore) throws IOException {
                     return super.doCompositeConnect(finalLocation);
                 };
             };

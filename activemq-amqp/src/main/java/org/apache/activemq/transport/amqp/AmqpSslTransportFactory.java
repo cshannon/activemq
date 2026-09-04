@@ -16,6 +16,7 @@
  */
 package org.apache.activemq.transport.amqp;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,7 +55,7 @@ public class AmqpSslTransportFactory extends SslTransportFactory implements Brok
 
     @SuppressWarnings("rawtypes")
     @Override
-    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws Exception {
+    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws IOException {
         transport = super.serverConfigure(transport, format, options);
 
         // strip off the mutex transport.

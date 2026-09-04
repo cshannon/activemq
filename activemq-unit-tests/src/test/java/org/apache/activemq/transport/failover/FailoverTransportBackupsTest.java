@@ -25,7 +25,6 @@ import java.net.URI;
 
 import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.command.BrokerInfo;
-import org.apache.activemq.command.Command;
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportFactory;
 import org.apache.activemq.transport.TransportListener;

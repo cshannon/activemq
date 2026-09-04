@@ -16,6 +16,7 @@
  */
 package org.apache.activemq.transport.stomp;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,7 +53,7 @@ public class StompTransportFactory extends TcpTransportFactory implements Broker
 
     @SuppressWarnings("rawtypes")
     @Override
-    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws Exception {
+    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws IOException {
         transport = super.serverConfigure(transport, format, options);
 
         MutexTransport mutex = transport.narrow(MutexTransport.class);

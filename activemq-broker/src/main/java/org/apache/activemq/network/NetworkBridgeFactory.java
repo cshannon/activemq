@@ -18,9 +18,6 @@ package org.apache.activemq.network;
 
 import java.net.URI;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.ServiceLoader;
-import java.util.Set;
 
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportFactory;

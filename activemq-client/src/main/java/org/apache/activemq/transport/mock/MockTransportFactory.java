@@ -18,13 +18,13 @@ package org.apache.activemq.transport.mock;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 
 import org.apache.activemq.transport.MutexTransport;
 import org.apache.activemq.transport.ResponseCorrelator;
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportFactory;
 import org.apache.activemq.transport.TransportServer;
+import org.apache.activemq.util.IOExceptionSupport;
 import org.apache.activemq.util.IntrospectionSupport;
 import org.apache.activemq.util.URISupport;
 import org.apache.activemq.util.URISupport.CompositeData;
@@ -32,16 +32,24 @@ import org.apache.activemq.util.URISupport.CompositeData;
 public class MockTransportFactory extends TransportFactory {
 
     @Override
-    public Transport doConnect(URI location) throws URISyntaxException, Exception {
-        Transport transport = createTransport(URISupport.parseComposite(location));
-        transport = new MutexTransport(transport);
-        transport = new ResponseCorrelator(transport);
-        return transport;
+    public Transport doConnect(URI location) throws IOException {
+        try {
+            Transport transport = createTransport(URISupport.parseComposite(location));
+            transport = new MutexTransport(transport);
+            transport = new ResponseCorrelator(transport);
+            return transport;
+        } catch (Exception e) {
+            throw IOExceptionSupport.create(e);
+        }
     }
 
     @Override
-    public Transport doCompositeConnect(URI location) throws URISyntaxException, Exception {
-        return createTransport(URISupport.parseComposite(location));
+    public Transport doCompositeConnect(URI location) throws IOException {
+        try {
+            return createTransport(URISupport.parseComposite(location));
+        } catch (Exception e) {
+            throw IOExceptionSupport.create(e);
+        }
     }
 
     /**

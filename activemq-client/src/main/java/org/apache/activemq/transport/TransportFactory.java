@@ -49,11 +49,11 @@ public abstract class TransportFactory {
 
     public abstract TransportServer doBind(URI location) throws IOException;
 
-    public Transport doConnect(URI location, Executor ex) throws Exception {
+    public Transport doConnect(URI location, Executor ex) throws IOException {
         return doConnect(location);
     }
 
-    public Transport doCompositeConnect(URI location, Executor ex) throws Exception {
+    public Transport doCompositeConnect(URI location, Executor ex) throws IOException {
         return doCompositeConnect(location);
     }
 
@@ -62,9 +62,9 @@ public abstract class TransportFactory {
      *
      * @param location
      * @return the transport
-     * @throws Exception
+     * @throws IOException
      */
-    public static Transport connect(URI location) throws Exception {
+    public static Transport connect(URI location) throws IOException {
         TransportFactory tf = findTransportFactory(location);
         return tf.doConnect(location);
     }
@@ -75,9 +75,9 @@ public abstract class TransportFactory {
      * @param location
      * @param ex
      * @return the transport
-     * @throws Exception
+     * @throws IOException
      */
-    public static Transport connect(URI location, Executor ex) throws Exception {
+    public static Transport connect(URI location, Executor ex) throws IOException {
         TransportFactory tf = findTransportFactory(location);
         return tf.doConnect(location, ex);
     }
@@ -88,9 +88,9 @@ public abstract class TransportFactory {
      *
      * @param location
      * @return the Transport
-     * @throws Exception
+     * @throws IOException
      */
-    public static Transport compositeConnect(URI location) throws Exception {
+    public static Transport compositeConnect(URI location) throws IOException {
         TransportFactory tf = findTransportFactory(location);
         return tf.doCompositeConnect(location);
     }
@@ -102,9 +102,9 @@ public abstract class TransportFactory {
      * @param location
      * @param ex
      * @return the Transport
-     * @throws Exception
+     * @throws IOException
      */
-    public static Transport compositeConnect(URI location, Executor ex) throws Exception {
+    public static Transport compositeConnect(URI location, Executor ex) throws IOException {
         TransportFactory tf = findTransportFactory(location);
         return tf.doCompositeConnect(location, ex);
     }
@@ -114,7 +114,7 @@ public abstract class TransportFactory {
         return tf.doBind(location);
     }
 
-    public Transport doConnect(URI location) throws Exception {
+    public Transport doConnect(URI location) throws IOException {
         try {
             Map<String, String> options = new HashMap<String, String>(URISupport.parseParameters(location));
             if( !options.containsKey("wireFormat.host") ) {
@@ -135,7 +135,7 @@ public abstract class TransportFactory {
         }
     }
 
-    public Transport doCompositeConnect(URI location) throws Exception {
+    public Transport doCompositeConnect(URI location) throws IOException {
         try {
             Map<String, String> options = new HashMap<String, String>(URISupport.parseParameters(location));
             WireFormat wf = createWireFormat(options);
@@ -165,7 +165,7 @@ public abstract class TransportFactory {
      * @throws IOException
      * @throws UnknownHostException
      */
-    protected Transport createTransport(URI location, WireFormat wf) throws MalformedURLException, UnknownHostException, IOException {
+    protected Transport createTransport(URI location, WireFormat wf) throws IOException {
         throw new IOException("createTransport() method not implemented!");
     }
 
@@ -225,10 +225,10 @@ public abstract class TransportFactory {
      * @param wf
      * @param options
      * @return
-     * @throws Exception
+     * @throws IOException
      */
     @SuppressWarnings("rawtypes")
-    public Transport configure(Transport transport, WireFormat wf, Map options) throws Exception {
+    public Transport configure(Transport transport, WireFormat wf, Map options) throws IOException {
         transport = compositeConfigure(transport, wf, options);
 
         transport = new MutexTransport(transport);
@@ -247,10 +247,10 @@ public abstract class TransportFactory {
      * @param format
      * @param options
      * @return
-     * @throws Exception
+     * @throws IOException
      */
     @SuppressWarnings("rawtypes")
-    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws Exception {
+    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws IOException {
         if (options.containsKey(THREAD_NAME_FILTER)) {
             transport = new ThreadNameFilter(transport);
         }

@@ -89,7 +89,7 @@ public class HttpTransportFactory extends TransportFactory {
 
     @Override
     @SuppressWarnings("rawtypes")
-    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws Exception {
+    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws IOException {
         return compositeConfigure(transport, format, options);
     }
 
