@@ -17,9 +17,11 @@
 package org.apache.activemq.util;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
+import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -59,9 +61,10 @@ import org.slf4j.LoggerFactory;
  * base64 payload laid out as {@code salt || [iv ||] ciphertext} with a fixed
  * 1000 key-derivation iterations: the salt length equals the cipher block
  * size (8 bytes for the default PBEWithMD5AndDES, 16 for AES algorithms) and
- * a 16-byte IV is present only for AES algorithms. Legacy values decrypt
- * transparently with a warning; re-encrypt them with the
- * {@code activemq encrypt} command.
+ * a 16-byte IV is present only for AES algorithms. Legacy passwords are
+ * normalized to Unicode NFC, matching jasypt; current-format passwords are
+ * used unchanged. Legacy values decrypt transparently with a warning;
+ * re-encrypt them with the {@code activemq encrypt} command.
  *
  * <p>The encryption password is taken from the {@link #setPassword password}
  * property when set, otherwise from the environment variable named by
@@ -307,8 +310,12 @@ public class ActiveMQEncryptor implements TextEncryptor, BytesEncryptor {
         var ciphertext = Arrays.copyOfRange(payload, saltLength + ivLength, payload.length);
 
         var passwordChars = resolvePassword();
+        char[] normalizedPasswordChars = null;
         try {
-            var keySpec = new PBEKeySpec(passwordChars);
+            var passwordBuffer = CharBuffer.wrap(passwordChars);
+            normalizedPasswordChars = Normalizer.isNormalized(passwordBuffer, Normalizer.Form.NFC)
+                    ? passwordChars : Normalizer.normalize(passwordBuffer, Normalizer.Form.NFC).toCharArray();
+            var keySpec = new PBEKeySpec(normalizedPasswordChars);
             SecretKey key;
             try {
                 key = SecretKeyFactory.getInstance(algorithm).generateSecret(keySpec);
@@ -333,6 +340,9 @@ public class ActiveMQEncryptor implements TextEncryptor, BytesEncryptor {
                     + " or wrong legacy algorithm (" + algorithm + ")", e);
         } finally {
             Arrays.fill(passwordChars, '\0');
+            if (normalizedPasswordChars != null && normalizedPasswordChars != passwordChars) {
+                Arrays.fill(normalizedPasswordChars, '\0');
+            }
         }
     }
 

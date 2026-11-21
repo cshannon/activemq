@@ -157,6 +157,32 @@ public class ActiveMQEncryptorTest {
     }
 
     @Test
+    public void testLegacyPasswordNfcNormalization() {
+        // Independent JDK PBEWithMD5AndDES fixture: NFC("master\u212A")
+        // is "masterK", salt 01..08, 1000 iterations, UTF-8 "password".
+        var encryptor = new ActiveMQEncryptor();
+        encryptor.setPassword("master\u212A");
+        assertEquals("password", encryptor.decrypt("AQIDBAUGBwh6oqXZqAh548mQYdJ8lAy3"));
+    }
+
+    @Test
+    public void testCurrentFormatPasswordIsNotNormalized() {
+        var encryptor = new ActiveMQEncryptor();
+        encryptor.setIterations(ActiveMQEncryptor.MIN_ITERATIONS);
+        encryptor.setPassword("master\u212A");
+        var token = encryptor.encrypt("password");
+        assertEquals("password", encryptor.decrypt(token));
+
+        var normalized = new ActiveMQEncryptor();
+        normalized.setPassword("masterK");
+        try {
+            normalized.decrypt(token);
+            fail("current-format passwords must not be normalized");
+        } catch (EncryptionException expected) {
+        }
+    }
+
+    @Test
     public void testLegacyValuesShippedInPreviousReleases() {
         // the ENC() values from conf/credentials-enc.properties of previous
         // releases, encrypted with the documented password "activemq"

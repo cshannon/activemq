@@ -25,7 +25,9 @@ import javax.security.auth.callback.CallbackHandler;
 import org.apache.activemq.util.ActiveMQEncryptor;
 
 /**
- * LDAPLoginModule that supports encryption
+ * LDAPLoginModule that supports {@code ENC(...)} values in LDAP options.
+ * Encryption settings ({@code encryptionPassword}, {@code passwordEnvName},
+ * and {@code encryptionAlgorithm}) are used literally, never decrypted.
  */
 public class EncryptableLDAPLoginModule extends LDAPLoginModule {
 
@@ -59,9 +61,12 @@ public class EncryptableLDAPLoginModule extends LDAPLoginModule {
         var decryptedOptions = new HashMap(options);
         for (var entryObject : decryptedOptions.entrySet()) {
             var entry = (Map.Entry) entryObject;
-            if (entry.getValue() instanceof String value
+            if (!ENCRYPTION_PASSWORD.equals(entry.getKey())
+                    && !PASSWORD_ENV_NAME.equals(entry.getKey())
+                    && !PASSWORD_ALGORITHM.equals(entry.getKey())
+                    && entry.getValue() instanceof String value
                     && ActiveMQEncryptor.isEncryptedValue(value)) {
-                entry.setValue(encryptor.decrypt(value));
+                entry.setValue(encryptor.decrypt(ActiveMQEncryptor.unwrapEncryptedValue(value)));
             }
         }
 

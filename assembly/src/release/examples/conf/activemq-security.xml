@@ -41,7 +41,9 @@
   <!-- Allows us to use encrypted properties as variables in this configuration file.
        Values are created with the 'activemq encrypt' command (AES-256-GCM); values
        encrypted by previous releases with jasypt are still supported and can be
-       selected with the legacyAlgorithm property (default PBEWithMD5AndDES). -->
+       selected with the legacyAlgorithm property (default PBEWithMD5AndDES).
+       Encrypted property values are decrypted before placeholder expansion,
+       including references embedded in larger values such as connection URLs. -->
   <bean id="configurationEncryptor" class="org.apache.activemq.util.ActiveMQEncryptor">
     <property name="passwordEnvName" value="ACTIVEMQ_ENCRYPTION_PASSWORD" />
   </bean>

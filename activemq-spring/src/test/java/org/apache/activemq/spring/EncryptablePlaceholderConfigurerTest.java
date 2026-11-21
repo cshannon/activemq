@@ -18,8 +18,19 @@ package org.apache.activemq.spring;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Map;
+import java.util.Properties;
+
+import org.apache.activemq.util.ActiveMQEncryptor;
+import org.apache.activemq.util.TextEncryptor;
 import org.junit.Test;
+import org.springframework.beans.factory.config.PropertyResourceConfigurer;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.StandardEnvironment;
 
 /**
  * Verifies that both encryptable placeholder configurers resolve plaintext,
@@ -36,6 +47,113 @@ public class EncryptablePlaceholderConfigurerTest {
     @Test
     public void testPropertySourcesPlaceholderConfigurerVariant() {
         assertResolves("org/apache/activemq/spring/encryptable-pspc-context.xml");
+    }
+
+    @Test
+    public void testCompositeAndNestedEncryptedProperties() {
+        var encryptor = new ActiveMQEncryptor();
+        encryptor.setPassword("activemq");
+        var properties = new Properties();
+        properties.setProperty("legacy", "ENC(4Pp68aOwkNEyvCcPBDCJAw==)");
+        properties.setProperty("current", ActiveMQEncryptor.wrapEncryptedValue(encryptor.encrypt("password")));
+        properties.setProperty("composite", "prefix-${legacy}-${current}-suffix");
+        properties.setProperty("manager", "nested-success");
+        for (var configurer : new PropertyResourceConfigurer[] {
+                new EncryptablePropertyPlaceholderConfigurer(encryptor),
+                new EncryptablePropertySourcesPlaceholderConfigurer(encryptor) }) {
+            configurer.setProperties(properties);
+            var target = resolve(configurer, "${composite}", "${${legacy}}", "${current}");
+            assertEquals("prefix-manager-password-suffix", target.getPlain());
+            assertEquals("nested-success", target.getLegacy());
+            assertEquals("password", target.getCurrent());
+        }
+    }
+
+    @Test
+    public void testEncryptedEnvironmentPropertiesBeforeExpansion() {
+        var encryptor = new ActiveMQEncryptor();
+        encryptor.setPassword("activemq");
+        var environment = new StandardEnvironment();
+        environment.getPropertySources().addFirst(new MapPropertySource("encrypted", Map.of(
+                "secret", "ENC(4Pp68aOwkNEyvCcPBDCJAw==)",
+                "manager", "nested-success")));
+        var configurer = new EncryptablePropertySourcesPlaceholderConfigurer(encryptor);
+        configurer.setEnvironment(environment);
+        var target = resolve(configurer, "prefix-${secret}-suffix", "${${secret}}", "${secret}");
+        assertEquals("prefix-manager-suffix", target.getPlain());
+        assertEquals("nested-success", target.getLegacy());
+        assertEquals("manager", target.getCurrent());
+    }
+
+    @Test
+    public void testBareTokenEncryptorWithBothConfigurers() {
+        TextEncryptor encryptor = new BareTokenEncryptor();
+        var properties = new Properties();
+        properties.setProperty("secret", ActiveMQEncryptor.wrapEncryptedValue(encryptor.encrypt("manager")));
+        properties.setProperty("manager", "nested-success");
+        for (var configurer : new PropertyResourceConfigurer[] {
+                new EncryptablePropertyPlaceholderConfigurer(encryptor),
+                new EncryptablePropertySourcesPlaceholderConfigurer(encryptor) }) {
+            configurer.setProperties(properties);
+            var target = resolve(configurer, "prefix-${secret}-suffix", "${${secret}}", "${secret}");
+            assertEquals("prefix-manager-suffix", target.getPlain());
+            assertEquals("nested-success", target.getLegacy());
+            assertEquals("manager", target.getCurrent());
+        }
+    }
+
+    @Test
+    public void testExplicitPropertySourcesAndTypedDecryption() {
+        var propertySources = new MutablePropertySources();
+        propertySources.addLast(new MapPropertySource("encrypted", Map.of("number", "ENC(testv1:42)")));
+        var configurer = new EncryptablePropertySourcesPlaceholderConfigurer(new BareTokenEncryptor());
+        configurer.setPropertySources(propertySources);
+        var properties = new Properties();
+        properties.setProperty("number", "wrong-local-value");
+        configurer.setProperties(properties);
+        var target = resolve(configurer, "${number}", "${number}", "${number}");
+        assertEquals("42", target.getPlain());
+        assertEquals(Integer.valueOf(42), configurer.createPropertyResolver(propertySources).getProperty("number", Integer.class));
+    }
+
+    @Test
+    public void testEncryptedPropertySourcePrecedence() {
+        for (var localOverride : new boolean[] { false, true }) {
+            var environment = new StandardEnvironment();
+            environment.getPropertySources().addFirst(new MapPropertySource("encrypted", Map.of("secret", "ENC(testv1:environment)")));
+            var configurer = new EncryptablePropertySourcesPlaceholderConfigurer(new BareTokenEncryptor());
+            configurer.setEnvironment(environment);
+            configurer.setLocalOverride(localOverride);
+            var properties = new Properties();
+            properties.setProperty("secret", "ENC(testv1:local)");
+            configurer.setProperties(properties);
+            var target = resolve(configurer, "${secret}", "${secret}", "${secret}");
+            assertEquals(localOverride ? "local" : "environment", target.getPlain());
+        }
+    }
+
+    private TargetBean resolve(PropertyResourceConfigurer configurer, String plain, String legacy, String current) {
+        var factory = new DefaultListableBeanFactory();
+        var definition = new RootBeanDefinition(TargetBean.class);
+        definition.getPropertyValues().add("plain", plain).add("legacy", legacy).add("current", current);
+        factory.registerBeanDefinition("target", definition);
+        configurer.postProcessBeanFactory(factory);
+        return factory.getBean("target", TargetBean.class);
+    }
+
+    private static class BareTokenEncryptor implements TextEncryptor {
+        @Override
+        public String encrypt(String value) {
+            return "testv1:" + value;
+        }
+
+        @Override
+        public String decrypt(String token) {
+            if (!token.startsWith("testv1:")) {
+                throw new IllegalArgumentException("Expected a bare token");
+            }
+            return token.substring("testv1:".length());
+        }
     }
 
     private void assertResolves(String contextResource) {

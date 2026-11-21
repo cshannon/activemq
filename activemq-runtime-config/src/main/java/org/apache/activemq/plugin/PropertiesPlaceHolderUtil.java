@@ -90,6 +90,7 @@ public class PropertiesPlaceHolderUtil {
     public void mergeProperties(Document doc, Properties initialProperties, BrokerContext brokerContext) {
         // find resources
         //        <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        //        or org.springframework.context.support.PropertySourcesPlaceholderConfigurer
         //            <property name="locations" || name="properties">
         //              ...
         //            </property>
@@ -99,7 +100,9 @@ public class PropertiesPlaceHolderUtil {
         NodeList beans = doc.getElementsByTagNameNS("*", "bean");
         for (int i = 0; i < beans.getLength(); i++) {
             Node bean = beans.item(0);
-            if (bean.hasAttributes() && bean.getAttributes().getNamedItem("class").getTextContent().contains("PropertyPlaceholderConfigurer")) {
+            if (bean.hasAttributes()
+                    && (bean.getAttributes().getNamedItem("class").getTextContent().contains("PropertyPlaceholderConfigurer")
+                    || bean.getAttributes().getNamedItem("class").getTextContent().contains("PropertySourcesPlaceholderConfigurer"))) {
                 if (bean.hasChildNodes()) {
                     NodeList beanProps = bean.getChildNodes();
                     for (int j = 0; j < beanProps.getLength(); j++) {

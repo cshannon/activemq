@@ -31,12 +31,16 @@ public class EncryptionSupport {
         decrypt(props, createEncryptor(algorithm));
     }
 
+    /**
+     * Decrypts marked properties, passing the bare token (without the
+     * {@code ENC(...)} marker) to the supplied encryptor.
+     */
     static public void decrypt(Properties props, TextEncryptor encryptor) {
         for (var k : new ArrayList<>(props.keySet())) {
             var key = (String) k;
             var value = props.getProperty(key);
             if (ActiveMQEncryptor.isEncryptedValue(value)) {
-                props.setProperty(key, encryptor.decrypt(value));
+                props.setProperty(key, encryptor.decrypt(ActiveMQEncryptor.unwrapEncryptedValue(value)));
             }
         }
     }

@@ -34,6 +34,8 @@ public interface TextEncryptor {
     /**
      * Decrypts a token produced by {@link #encrypt}. Implementations may
      * also accept other formats, such as {@code ENC(...)} wrapped values.
+     * Property adapters remove the {@code ENC(...)} marker before calling
+     * this method, so implementations need only accept their bare tokens.
      */
     String decrypt(String value);
 }
