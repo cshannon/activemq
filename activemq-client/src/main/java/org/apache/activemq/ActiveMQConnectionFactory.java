@@ -431,13 +431,11 @@ public class ActiveMQConnectionFactory extends JNDIBaseStorable implements Conne
         ActiveMQConnection connection = new ActiveMQConnection(transport, getClientIdGenerator(),
                 getConnectionIdGenerator(), stats);
 
-        // Copy the compliance flags from the Factory to the Connection
-        connection.setStrictCompliance(isStrictCompliance());
-
         return connection;
     }
 
     protected void configureConnection(ActiveMQConnection connection) throws JMSException {
+        connection.setStrictCompliance(isStrictCompliance());
         connection.setPrefetchPolicy(getPrefetchPolicy());
         connection.setDisableTimeStampsByDefault(isDisableTimeStampsByDefault());
         connection.setOptimizedMessageDispatch(isOptimizedMessageDispatch());
@@ -1065,6 +1063,9 @@ public class ActiveMQConnectionFactory extends JNDIBaseStorable implements Conne
 
     /**
      * If this flag is set then the connection follows strict Jakarta Messaging compliance.
+     * Applies to ordinary and XA connections, including SSL factories. Authentication
+     * occurs during creation, administratively configured client IDs cannot be changed
+     * by applications, and non-standard message property types are rejected.
      */
     public void setStrictCompliance(boolean strictCompliance) {
         this.strictCompliance = strictCompliance;

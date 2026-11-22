@@ -28,6 +28,9 @@ import java.io.ObjectOutputStream;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.jms.Connection;
+import jakarta.jms.MessageConsumer;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.Queue;
 import jakarta.jms.Session;
 import jakarta.jms.TopicSubscriber;
 import javax.transaction.xa.XAResource;
@@ -101,6 +104,70 @@ public class ActiveMQConnectionFactoryTest {
 
         con.close();
         ra.stop();
+    }
+
+    @Test(timeout = 60000)
+    public void testStrictAdapterClientId() throws Exception {
+        assertAdapterClientId(true, null);
+    }
+
+    @Test(timeout = 60000)
+    public void testLegacyAdapterClientId() throws Exception {
+        assertAdapterClientId(false, null);
+    }
+
+    @Test(timeout = 60000)
+    public void testStrictAdapterClientIdWithInjectedFactory() throws Exception {
+        org.apache.activemq.ActiveMQConnectionFactory factory =
+            new org.apache.activemq.ActiveMQConnectionFactory(url + "&jms.strictCompliance=true");
+        assertAdapterClientId(true, factory);
+    }
+
+    @Test(timeout = 60000)
+    public void testLegacyAdapterClientIdOverridesInjectedFactoryId() throws Exception {
+        org.apache.activemq.ActiveMQConnectionFactory factory =
+            new org.apache.activemq.ActiveMQConnectionFactory(url);
+        factory.setClientID("factory-client");
+        assertAdapterClientId(false, factory);
+    }
+
+    private void assertAdapterClientId(boolean strict, org.apache.activemq.ActiveMQConnectionFactory factory) throws Exception {
+        ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
+        ra.setServerUrl(url + "&jms.strictCompliance=" + strict);
+        ra.setUserName(user);
+        ra.setPassword(pwd);
+        ra.setClientid("adapter-client");
+        if (factory != null) {
+            ra.setConnectionFactory(factory);
+        }
+
+        try (Connection connection = ra.makeConnection()) {
+            assertEquals(strict, ((ActiveMQConnection) connection).isStrictCompliance());
+            assertEquals("adapter-client", connection.getClientID());
+            if (strict) {
+                for (String clientId : new String[] {"adapter-client", "application-client"}) {
+                    try {
+                        connection.setClientID(clientId);
+                        fail("Strict connections must reject application clientID assignment");
+                    } catch (jakarta.jms.IllegalStateException expected) {
+                    }
+                    assertEquals("adapter-client", connection.getClientID());
+                }
+            }
+
+            try (Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE)) {
+                Queue queue = session.createQueue("TEST.ADAPTER.CLIENTID");
+                MessageConsumer consumer = session.createConsumer(queue);
+                MessageProducer producer = session.createProducer(queue);
+                connection.start();
+                producer.send(session.createTextMessage("usable"));
+                jakarta.jms.Message message = consumer.receive(5000);
+                assertNotNull("Adapter connection must deliver messages", message);
+                assertEquals("usable", message.getBody(String.class));
+            }
+        } finally {
+            ra.stop();
+        }
     }
 
     @Test(timeout = 60000)

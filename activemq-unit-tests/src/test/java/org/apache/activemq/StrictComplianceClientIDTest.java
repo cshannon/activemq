@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import jakarta.jms.IllegalStateRuntimeException;
+import jakarta.jms.XAConnectionFactory;
 
 import org.apache.activemq.broker.BrokerService;
 import org.junit.After;
@@ -89,6 +90,48 @@ public class StrictComplianceClientIDTest {
         try (var connection = factory.createConnection()) {
             connection.setClientID("application-override");
             assertEquals("application-override", connection.getClientID());
+        }
+    }
+
+    @Test(timeout = 60000)
+    public void testStrictXARejectsOverridingAdminConfiguredClientID() throws Exception {
+        for (var factory : new ActiveMQConnectionFactory[] {
+                new ActiveMQXAConnectionFactory("vm://localhost"),
+                new ActiveMQXASslConnectionFactory("vm://localhost")}) {
+            factory.setStrictCompliance(true);
+            factory.setClientID("admin-configured-xa");
+            var xaFactory = (XAConnectionFactory) factory;
+
+            try (var connection = xaFactory.createXAConnection()) {
+                try {
+                    connection.setClientID("application-override");
+                    fail("Expected IllegalStateException overriding an administratively configured XA clientID");
+                } catch (jakarta.jms.IllegalStateException expected) {
+                }
+                assertEquals("admin-configured-xa", connection.getClientID());
+            }
+
+            try (var context = xaFactory.createXAContext()) {
+                try {
+                    context.setClientID("application-override");
+                    fail("Expected IllegalStateRuntimeException overriding an administratively configured XA clientID");
+                } catch (IllegalStateRuntimeException expected) {
+                }
+                assertEquals("admin-configured-xa", context.getClientID());
+            }
+        }
+    }
+
+    @Test(timeout = 60000)
+    public void testLegacyXAAllowsOverridingAdminConfiguredClientID() throws Exception {
+        for (var factory : new ActiveMQConnectionFactory[] {
+                new ActiveMQXAConnectionFactory("vm://localhost"),
+                new ActiveMQXASslConnectionFactory("vm://localhost")}) {
+            factory.setClientID("admin-configured-xa");
+            try (var connection = ((XAConnectionFactory) factory).createXAConnection()) {
+                connection.setClientID("application-override");
+                assertEquals("application-override", connection.getClientID());
+            }
         }
     }
 }

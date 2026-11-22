@@ -18,9 +18,12 @@ package org.apache.activemq;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+
+import javax.management.ObjectName;
 
 import jakarta.jms.JMSException;
 import jakarta.jms.JMSSecurityException;
@@ -28,6 +31,7 @@ import jakarta.jms.JMSSecurityRuntimeException;
 
 import org.apache.activemq.broker.BrokerPlugin;
 import org.apache.activemq.broker.BrokerService;
+import org.apache.activemq.broker.jmx.BrokerMBeanSupport;
 import org.apache.activemq.security.AuthenticationUser;
 import org.apache.activemq.security.SimpleAuthenticationPlugin;
 import org.junit.After;
@@ -48,7 +52,9 @@ public class StrictComplianceAuthenticationTest {
     public void setUp() throws Exception {
         broker = new BrokerService();
         broker.setPersistent(false);
-        broker.setUseJmx(false);
+        broker.setBrokerName("strict-authentication");
+        broker.setUseJmx(true);
+        broker.getManagementContext().setCreateConnector(false);
         broker.setAdvisorySupport(false);
         var users = new ArrayList<AuthenticationUser>();
         users.add(new AuthenticationUser("system", "manager", "users,admins"));
@@ -114,6 +120,34 @@ public class StrictComplianceAuthenticationTest {
             connection.start();
             assertEquals("strict-client", connection.getClientID());
         }
+    }
+
+    @Test(timeout = 60000)
+    public void testStrictConnectionRegistersActualClientIDInJmx() throws Exception {
+        var factory = new ActiveMQConnectionFactory(connectionUri);
+        factory.setStrictCompliance(true);
+        var connectionNames = new ObjectName(broker.getBrokerObjectName()
+                + ",connector=clientConnectors,connectorName=*,connectionViewType=clientId,connectionName=*");
+        var connectorName = BrokerMBeanSupport.createConnectorName(broker.getBrokerObjectName(),
+                "clientConnectors", broker.getTransportConnectors().get(0).getName());
+        var expectedName = BrokerMBeanSupport.createConnectionViewByType(connectorName, "clientId", "strict-jmx-client");
+
+        try (var connection = factory.createConnection("system", "manager")) {
+            connection.setClientID("strict-jmx-client");
+            // setClientID waits for the real ConnectionInfo response, so the
+            // preceding authentication probe removal has also been processed.
+            connection.start();
+
+            var registeredNames = broker.getManagementContext().queryNames(connectionNames, null);
+            assertEquals("Only the actual client ID should be registered, not the authentication probe", 1,
+                    registeredNames.size());
+            assertTrue("The actual client ID must be visible through JMX", registeredNames.contains(expectedName));
+            assertEquals("strict-jmx-client", broker.getManagementContext().getMBeanServer()
+                    .getAttribute(expectedName, "ClientId"));
+        }
+
+        assertTrue("Closing the connection must remove its client ID registration",
+                broker.getManagementContext().queryNames(connectionNames, null).isEmpty());
     }
 
     @Test(timeout = 60000)

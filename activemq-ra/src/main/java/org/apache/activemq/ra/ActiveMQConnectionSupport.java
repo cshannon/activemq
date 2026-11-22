@@ -89,7 +89,7 @@ public class ActiveMQConnectionSupport {
         ActiveMQConnection physicalConnection = (ActiveMQConnection) connectionFactory.createConnection(userName, password);
 
         String clientId = connectionRequestInfo.getClientid();
-        if (clientId != null && clientId.length() > 0) {
+        if (clientId != null && clientId.length() > 0 && !clientId.equals(physicalConnection.getClientID())) {
             physicalConnection.setClientID(clientId);
         }
         return physicalConnection;

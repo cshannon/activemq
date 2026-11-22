@@ -16,11 +16,16 @@
  */
 package org.apache.activemq.ra;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.Collections;
+
+import jakarta.jms.Connection;
 import jakarta.jms.ConnectionFactory;
 import jakarta.jms.JMSException;
 import jakarta.jms.MessageProducer;
@@ -193,6 +198,55 @@ public class ManagedConnectionTest {
             physicalConnection.setClientID("test4");
             fail("Should have received JMSException");
         } catch (JMSException e) {
+        }
+    }
+
+    @Test(timeout = 60000)
+    public void testMatchStrictManagedConnectionWithClientId() throws Exception {
+        ActiveMQConnectionRequestInfo info = new ActiveMQConnectionRequestInfo();
+        info.setServerUrl(DEFAULT_HOST + "&jms.strictCompliance=true");
+        info.setClientid("managed-client");
+        ActiveMQManagedConnection strictConnection = (ActiveMQManagedConnection)
+            managedConnectionFactory.createManagedConnection(null, info);
+        try {
+            assertTrue(((ActiveMQConnection) strictConnection.getPhysicalConnection()).isStrictCompliance());
+            assertSame(strictConnection, managedConnectionFactory.matchManagedConnections(
+                Collections.singleton(strictConnection), null, info));
+            try (Connection proxy = (Connection) strictConnection.getConnection(null, info)) {
+                assertEquals("managed-client", proxy.getClientID());
+                try {
+                    proxy.setClientID("application-client");
+                    fail("Strict managed connections must reject application clientID assignment");
+                } catch (jakarta.jms.IllegalStateException expected) {
+                }
+                try (Session session = proxy.createSession(false, Session.AUTO_ACKNOWLEDGE)) {
+                    proxy.start();
+                    doWork(session);
+                    assertSame(strictConnection, managedConnectionFactory.matchManagedConnections(
+                        Collections.singleton(strictConnection), null, info));
+                    assertEquals("managed-client", proxy.getClientID());
+                }
+            }
+            strictConnection.cleanup();
+            assertSame(strictConnection, managedConnectionFactory.matchManagedConnections(
+                Collections.singleton(strictConnection), null, info));
+            try (Connection proxy = (Connection) strictConnection.getConnection(null, info)) {
+                assertEquals("managed-client", proxy.getClientID());
+                for (String clientId : new String[] {"managed-client", "application-client"}) {
+                    try {
+                        proxy.setClientID(clientId);
+                        fail("Strict managed connections must reject clientID assignment after cleanup");
+                    } catch (jakarta.jms.IllegalStateException expected) {
+                    }
+                }
+                try (Session session = proxy.createSession(false, Session.AUTO_ACKNOWLEDGE)) {
+                    proxy.start();
+                    doWork(session);
+                    assertEquals("managed-client", proxy.getClientID());
+                }
+            }
+        } finally {
+            strictConnection.destroy();
         }
     }
 

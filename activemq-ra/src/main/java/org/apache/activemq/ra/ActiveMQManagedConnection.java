@@ -127,7 +127,8 @@ public class ActiveMQManagedConnection implements ManagedConnection, ExceptionLi
         }
 
         // Do we need to set the clientId?
-        if (info.getClientid() != null && info.getClientid().length() > 0) {
+        if (info.getClientid() != null && info.getClientid().length() > 0
+            && !info.getClientid().equals(physicalConnection.getClientID())) {
             physicalConnection.setClientID(info.getClientid());
         }
 

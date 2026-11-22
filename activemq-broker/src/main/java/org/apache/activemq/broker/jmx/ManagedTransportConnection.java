@@ -23,6 +23,7 @@ import javax.management.ObjectName;
 import org.apache.activemq.broker.Broker;
 import org.apache.activemq.broker.TransportConnection;
 import org.apache.activemq.broker.TransportConnector;
+import org.apache.activemq.command.ConnectionId;
 import org.apache.activemq.command.ConnectionInfo;
 import org.apache.activemq.command.Response;
 import org.apache.activemq.thread.TaskRunnerFactory;
@@ -75,15 +76,27 @@ public class ManagedTransportConnection extends TransportConnection {
     @Override
     public Response processAddConnection(ConnectionInfo info) throws Exception {
         Response answer = super.processAddConnection(info);
-        String clientId = info.getClientId();
-        if (populateUserName) {
-            ((ConnectionView) mbean).setUserName(info.getUserName());
-        }
-        if (clientId != null) {
-            if (byClientIdName == null) {
-                byClientIdName = createObjectName("clientId", clientId);
-                registerMBean(byClientIdName);
+        synchronized (this) {
+            if (!isStopping() && lookupConnectionState(info.getConnectionId()) != null) {
+                if (populateUserName) {
+                    ((ConnectionView) mbean).setUserName(info.getUserName());
+                }
+                if (info.getClientId() != null && byClientIdName == null) {
+                    byClientIdName = createObjectName("clientId", info.getClientId());
+                    registerMBean(byClientIdName);
+                }
             }
+        }
+        return answer;
+    }
+
+    @Override
+    public synchronized Response processRemoveConnection(ConnectionId id, long lastDeliveredSequenceId)
+            throws InterruptedException {
+        Response answer = super.processRemoveConnection(id, lastDeliveredSequenceId);
+        if (listConnectionStates().isEmpty()) {
+            unregisterMBean(byClientIdName);
+            byClientIdName = null;
         }
         return answer;
     }

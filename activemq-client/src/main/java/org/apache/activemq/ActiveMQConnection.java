@@ -481,8 +481,9 @@ public class ActiveMQConnection implements Connection, TopicConnection, QueueCon
     }
 
     /**
-     * Sets the default client id that the connection will use if explicitly not
-     * set with the setClientId() call.
+     * Sets the administratively configured client ID. Under strict compliance it
+     * cannot be changed by applications and is retained when the connection is reused.
+     * Legacy connections may override it with setClientID().
      */
     public void setDefaultClientID(String clientID) throws JMSException {
         this.info.setClientId(clientID);
@@ -1711,9 +1712,11 @@ public class ActiveMQConnection implements Connection, TopicConnection, QueueCon
                 }
                 isConnectionInfoSentToBroker = false;
             }
-            if (userSpecifiedClientID) {
+            // Strict connections retain the factory-configured identity when reused.
+            if (userSpecifiedClientID && !(adminConfiguredClientID && strictCompliance)) {
                 info.setClientId(null);
                 userSpecifiedClientID = false;
+                adminConfiguredClientID = false;
             }
             clientIDSet = false;
         }
